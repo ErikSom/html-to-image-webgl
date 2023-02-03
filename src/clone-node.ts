@@ -9,7 +9,66 @@ async function cloneCanvasElement(canvas: HTMLCanvasElement) {
   if (dataURL === 'data:,') {
     return canvas.cloneNode(false) as HTMLCanvasElement
   }
-  return createImage(dataURL)
+
+  if (canvas.getContext('2d')) {
+    return createImage(dataURL)
+  }
+
+  const out = document
+    .createElement('canvas')
+    .getContext('2d', { alpha: true })!
+  out.canvas.width = canvas.width
+  out.canvas.height = canvas.height
+  const data = out.getImageData(0, 0, out.canvas.width, out.canvas.height)
+
+  const webglDataURL: string = await new Promise((resolve) => {
+    try {
+      requestAnimationFrame(() => {
+        const gl = document.createElement('canvas')!.getContext('webgl')!
+        const tex = gl.createTexture()
+        gl.bindTexture(gl.TEXTURE_2D, tex)
+        gl.texImage2D(
+          gl.TEXTURE_2D,
+          0,
+          gl.RGB,
+          gl.RGB,
+          gl.UNSIGNED_BYTE,
+          canvas,
+        )
+        const fb = gl.createFramebuffer()
+        gl.bindFramebuffer(gl.FRAMEBUFFER, fb)
+        gl.framebufferTexture2D(
+          gl.FRAMEBUFFER,
+          gl.COLOR_ATTACHMENT0,
+          gl.TEXTURE_2D,
+          tex,
+          0,
+        )
+        gl.readPixels(
+          0,
+          0,
+          canvas.width,
+          canvas.height,
+          gl.RGBA,
+          gl.UNSIGNED_BYTE,
+          new Uint8Array(data.data.buffer),
+        )
+        out.putImageData(data, 0, 0)
+        // clean up memory
+        gl.deleteTexture(tex)
+        gl.deleteFramebuffer(fb)
+        const ext = gl.getExtension('WEBGL_lose_context')
+        if (ext) {
+          ext.loseContext()
+        }
+        resolve(out.canvas.toDataURL())
+      })
+    } catch (err) {
+      resolve(dataURL)
+    }
+  })
+
+  return createImage(webglDataURL)
 }
 
 async function cloneVideoElement(video: HTMLVideoElement, options: Options) {
@@ -133,11 +192,11 @@ function cloneCSSStyle<T extends HTMLElement>(nativeNode: T, clonedNode: T) {
       ) {
         value = 'block'
       }
-      
+
       if (name === 'd' && clonedNode.getAttribute('d')) {
         value = `path(${clonedNode.getAttribute('d')})`
       }
-      
+
       targetStyle.setProperty(
         name,
         value,
