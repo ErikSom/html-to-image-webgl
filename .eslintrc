@@ -1,3 +1,5 @@
 {
-  "extends": "@bubkoo/eslint-config"
+  "extends": "@bubkoo/eslint-config",
+  // ignore es and lib folders
+  "ignorePatterns": ["es/", "lib/"]
 }
