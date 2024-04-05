@@ -7,8 +7,13 @@ async function cloneCanvasElement(canvas) {
     if (dataURL === 'data:,') {
         return canvas.cloneNode(false);
     }
-    if (canvas.getContext('2d')) {
-        return createImage(dataURL);
+    try {
+        if (canvas.getContext('2d')) {
+            return createImage(dataURL);
+        }
+    }
+    catch (_a) {
+        // Canvas is tainted, probably due to a cross-origin image
     }
     const out = document
         .createElement('canvas')
